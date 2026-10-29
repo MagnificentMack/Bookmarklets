@@ -1,4 +1,16 @@
 [
+    {
+    "name": "AI Chat",
+    "file": "chatBot.js",
+    "desc": "Full AI Chat Bot",
+    "tags": "Magnificent Mack"
+  },
+    {
+    "name": "AI Chat (lite)",
+    "file": "ai-chat-lite.js",
+    "desc": "Chat overlay using OpenRouter, asks for your key on first use",
+    "tags": "ai chat openrouter"
+  },
   {
     "name": "Krillion Cheats",
     "file": "gemini-screenshot.js",
@@ -12,12 +24,7 @@
     "desc": "Krillion clone",
     "tags": "krillion game multiplayer openrouter"
   },
-  {
-    "name": "AI Chat (lite)",
-    "file": "ai-chat-lite.js",
-    "desc": "Chat overlay using OpenRouter, asks for your key on first use",
-    "tags": "ai chat openrouter"
-  },
+
   {
     "name": "I Frame",
     "file": "float-window.js",
@@ -42,4 +49,5 @@
     "desc": "Canvas effect on click",
     "tags": "effect canvas fun"
   }
+
 ]
