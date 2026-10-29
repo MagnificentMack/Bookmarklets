@@ -12,7 +12,7 @@
     "tags": "ai chat openrouter"
   },
     {
-    "name": "I Frame",
+    "name": "IFrame",
     "file": "float-window.js",
     "desc": "Open any URL in a draggable, resizable window",
     "tags": "iframe browser window"
