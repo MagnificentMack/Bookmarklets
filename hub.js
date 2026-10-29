@@ -67,7 +67,7 @@
     else if (e.key === 'Enter' && shown[sel]) run(shown[sel]);
   });
 
-  fetch(BASE + 'tools.json')
+  fetch(BASE + 'tools.json', { cache: 'no-cache' })
     .then(r => r.json())
     .then(data => {
       const site = location.hostname;
