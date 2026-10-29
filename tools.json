@@ -5,11 +5,17 @@
     "desc": "Full AI Chat Bot",
     "tags": "Magnificent Mack"
   },
-    {
+  {
     "name": "AI Chat (lite)",
     "file": "ai-chat-lite.js",
     "desc": "Chat overlay using OpenRouter, asks for your key on first use",
     "tags": "ai chat openrouter"
+  },
+    {
+    "name": "I Frame",
+    "file": "float-window.js",
+    "desc": "Open any URL in a draggable, resizable window",
+    "tags": "iframe browser window"
   },
   {
     "name": "Krillion Cheats",
@@ -24,13 +30,19 @@
     "desc": "Krillion clone",
     "tags": "krillion game multiplayer openrouter"
   },
-
   {
-    "name": "I Frame",
-    "file": "float-window.js",
-    "desc": "Open any URL in a draggable, resizable window",
-    "tags": "iframe browser window"
+    "name": "Chess",
+    "file": "chess.js",
+    "desc": "Play chess against a bot (Easy, Medium, Hard)",
+    "tags": "game chess"
   },
+  {
+    "name": "Tic-tac-toe",
+    "file": "tictactoe.js",
+    "desc": "Unbeatable bot, easy bot, or 2 players",
+    "tags": "XOXO"
+  },
+  
   {
     "name": "Bit Jets",
     "file": "bit-jets.js",
