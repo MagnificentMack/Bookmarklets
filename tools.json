@@ -1,0 +1,45 @@
+[
+  {
+    "name": "Gemini screenshot answers",
+    "file": "gemini-screenshot.js",
+    "desc": "Screenshot the page and get the best answer from Gemini (needs window.__K)",
+    "tags": "krillion ai screenshot gemini",
+    "sites": ["krillion.io", "krillion.org"]
+  },
+  {
+    "name": "Krillion trainer",
+    "file": "krillion-trainer.js",
+    "desc": "Krillion-style dive game with multiplayer rooms (needs window.__OR)",
+    "tags": "krillion game multiplayer openrouter"
+  },
+  {
+    "name": "AI chat (lite)",
+    "file": "ai-chat-lite.js",
+    "desc": "Chat overlay using OpenRouter, asks for your key on first use",
+    "tags": "ai chat openrouter"
+  },
+  {
+    "name": "Floating URL window",
+    "file": "float-window.js",
+    "desc": "Open any URL in a draggable, resizable window",
+    "tags": "iframe browser window"
+  },
+  {
+    "name": "Bit Jets",
+    "file": "bit-jets.js",
+    "desc": "Dogfight game. Multiplayer: bitjets.tiiny.site",
+    "tags": "game jets multiplayer"
+  },
+  {
+    "name": "FB canvas toy",
+    "file": "fb-game.js",
+    "desc": "Canvas game or effect (click again to stop)",
+    "tags": "game canvas"
+  },
+  {
+    "name": "Lightning storm",
+    "file": "lightning.js",
+    "desc": "Rain and lightning overlay on the page",
+    "tags": "effect canvas fun"
+  }
+]

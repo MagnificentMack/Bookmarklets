@@ -22,7 +22,7 @@
       .m{padding:12px;color:#999}
     </style>
     <div class='p'>
-      <div class='h'><input placeholder='Search tools...'><span class='x'>✕</span></div>
+      <div class='h'><input placeholder='Search tools...'><span class='x'>\u2715</span></div>
       <div class='l'><div class='m'>Loading...</div></div>
     </div>`;
   document.body.appendChild(host);
