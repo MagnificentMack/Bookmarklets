@@ -1,0 +1,35 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$room": {
+        "messages": {
+          ".read": true,
+          "$id": {
+            ".write": "!data.exists() && newData.exists()",
+            ".validate": "newData.hasChildren(['n', 't', 'ts'])",
+            "n": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 24" },
+            "t": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500" },
+            "ts": { ".validate": "newData.val() == now" },
+            "$other": { ".validate": false }
+          }
+        },
+        "reads": {
+          "$u": {
+            ".read": true,
+            ".write": true,
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          }
+        },
+        "presence": {
+          ".read": true,
+          "$u": {
+            ".write": true,
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+          }
+        }
+      }
+    }
+  }
+}
