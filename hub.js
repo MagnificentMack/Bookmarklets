@@ -4,14 +4,15 @@
   const M = /\/gh\/([^/]+)\/([^@/]+)@([^/]+)\//.exec(SRC);
   if (!M) { alert('Hub: could not read the repo from the script address.'); return; }
   const USER = M[1], REPO = M[2], VER = M[3];
-  const base = (v = VER) => 'https://cdn.jsdelivr.net/gh/' + USER + '/' + REPO + '@' + v + '/';
+  const CDN = SRC.slice(0, SRC.indexOf('/gh/')) || 'https://cdn.jsdelivr.net';
+  const base = (v = VER) => CDN + '/gh/' + USER + '/' + REPO + '@' + v + '/';
   const bust = u => u + (u.includes('?') ? '&' : '?') + '_=' + Date.now();
   const ID = '__hub_root';
   document.getElementById(ID)?.remove();
 
   // ---- Settings (saved in this site's localStorage, so they are per-site) ----
   const SK = '__hub_settings_v1';
-  const DEF = { theme: 'dark', size: 'm', sort: 'order', siteFirst: true, desc: true, closeOnRun: true, favs: [], recent: [] };
+  const DEF = { theme: 'dark', size: 'm', sort: 'order', siteFirst: true, desc: true, closeOnRun: true, copyKeys: true, favs: [], recent: [] };
   const SIZES = { s: { w: 280, f: 13 }, m: { w: 320, f: 14 }, l: { w: 380, f: 16 } };
   const S = (() => { try { return { ...DEF, ...JSON.parse(localStorage.getItem(SK) || '{}') }; } catch { return { ...DEF }; } })();
   const save = () => { try { localStorage.setItem(SK, JSON.stringify(S)); } catch {} };
@@ -54,6 +55,14 @@
       a.lnk:hover{text-decoration:underline}
       .info{padding:3px 6px;color:var(--mut);font-size:.9em}
       .ok{color:#3fb950}.no{color:#f85149}
+      .note.err{background:#3d1f1f;color:#ffb4ab}
+      .more{font-weight:700;padding:2px 7px;border-radius:6px}
+      .more:hover,.more.on{background:var(--hv);color:var(--fg)}
+      .sub{margin:2px 10px 8px;padding:6px;border-radius:8px;background:var(--in);border:1px solid var(--bd)}
+      .sub .mi{display:block;width:100%;text-align:left;background:none;color:var(--fg);border:0;border-radius:6px;padding:8px;margin:0;cursor:pointer;font:inherit}
+      .sub .mi:hover{background:var(--hv)}
+      .sub .hint{padding:4px 8px 2px;color:var(--mut);font-size:.82em;line-height:1.35}
+      .sub textarea{width:100%;height:70px;margin-top:6px;background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:6px;font:11px monospace}
     </style>
     <div class='p'>
       <div class='h'>
@@ -70,7 +79,7 @@
 
   const $ = s => root.querySelector(s);
   const P = $('.p'), q = $('input.q'), ttl = $('.ttl'), note = $('.note'), lPane = $('.l'), sPane = $('.s');
-  let tools = [], shown = [], sel = 0, view = 'list', updStatus = null;
+  let tools = [], shown = [], sel = 0, view = 'list', updStatus = null, menuFor = '', manual = null, noteT = 0;
   const close = () => host.remove();
 
   const applyLook = () => {
@@ -100,8 +109,10 @@
     const qs = q.value.toLowerCase();
     shown = rank().filter(t => (t.name + ' ' + (t.desc || '') + ' ' + (t.tags || '')).toLowerCase().includes(qs));
     sel = Math.min(sel, Math.max(shown.length - 1, 0));
+    const keepTop = lPane.scrollTop;
     lPane.textContent = '';
     if (!shown.length) { lPane.append(el('div', { className: 'm', textContent: tools.length ? 'No matches' : 'No tools yet' })); return; }
+    let subEl = null;
     shown.forEach((t, i) => {
       const fav = S.favs.includes(t.file);
       const txt = el('div', { className: 't' }, el('b', { textContent: t.name }));
@@ -110,12 +121,86 @@
       star.onclick = e => {
         e.stopPropagation();
         S.favs = fav ? S.favs.filter(f => f !== t.file) : [...S.favs, t.file];
-        save(); render();
+        save(); render(); q.focus();
       };
-      const row = el('div', { className: 'i' + (i === sel ? ' sel' : '') }, txt, star);
+      const open = menuFor === t.file;
+      const more = el('span', { className: 'st more' + (open ? ' on' : ''), title: 'More ways to launch', textContent: '\u22EE' });
+      more.onclick = e => { e.stopPropagation(); menuFor = open ? '' : t.file; manual = null; render(); q.focus(); };
+      const row = el('div', { className: 'i' + (i === sel ? ' sel' : '') }, txt, star, more);
       row.onclick = () => run(t);
       lPane.append(row);
+      if (open) {
+        const item = (label, fn) => el('button', { className: 'mi', textContent: label, onclick: e => { e.stopPropagation(); fn(t); } });
+        const sub = el('div', { className: 'sub' },
+          item('Open in a new tab', runNewTab),
+          item('Copy code to run in another tab', copyCode),
+          el('div', { className: 'hint', textContent: 'A bookmarklet cannot reach into another tab, so to use a tool on a page where the hub is blocked (like Google Docs): copy the code, switch to that tab, press F12, open Console, paste, press Enter.' }));
+        if (manual && manual.file === t.file) {
+          const ta = el('textarea', { value: manual.code, readOnly: true });
+          ta.onfocus = () => ta.select();
+          sub.append(ta);
+        }
+        lPane.append(sub); subEl = sub;
+      }
     });
+    lPane.scrollTop = keepTop;
+    if (subEl) {   // make sure the open menu is fully visible
+      const r = subEl.getBoundingClientRect(), pr = lPane.getBoundingClientRect();
+      if (r.bottom > pr.bottom) lPane.scrollTop += r.bottom - pr.bottom + 8;
+    }
+  }
+
+  const CFG = ['__K', '__OR', '__CHAT_DB', '__CHAT_ROOM', '__CHAT_NAME'];
+  const flash = (msg, ms = 10000, isErr = false) => {
+    note.textContent = msg; note.className = 'note' + (isErr ? ' err' : ''); note.hidden = false;
+    clearTimeout(noteT); noteT = setTimeout(() => { note.hidden = true; }, ms);
+  };
+  async function getToolCode(t) {
+    const r = await fetch(bust(base() + 'tools/' + t.file), { cache: 'no-store' });
+    if (!r.ok) throw new Error(t.file + ' returned ' + r.status);
+    const code = await r.text();
+    const pre = S.copyKeys ? CFG.filter(k => window[k] != null && window[k] !== '').map(k => 'window.' + k + '=' + JSON.stringify(window[k]) + ';').join('\n') : '';
+    return '// ' + t.name + ' (copied from Hub)\n' + (pre ? pre + '\n' : '') + code;
+  }
+  async function copyCode(t) {
+    flash('Getting the code...', 4000);
+    try {
+      const p = getToolCode(t);
+      let ok = false;
+      try {   // deferred clipboard write keeps the click's permission even though we fetch first
+        if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+          await navigator.clipboard.write([new ClipboardItem({ 'text/plain': p.then(x => new Blob([x], { type: 'text/plain' })) })]);
+          ok = true;
+        }
+      } catch {}
+      const code = await p;
+      if (!ok) { try { await navigator.clipboard.writeText(code); ok = true; } catch {} }
+      if (!ok) {
+        try { const ta = document.createElement('textarea'); ta.value = code; ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+          document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch {}
+      }
+      if (ok) flash('Copied "' + t.name + '". Switch to the other tab, press F12, open Console (if it asks, type "allow pasting" and press Enter), paste, press Enter.');
+      else { manual = { file: t.file, code }; flash('Could not copy automatically. Select the box below, copy it, and paste it into the other tab\'s console.', 12000, true); render(); }
+    } catch (e) { flash('Could not get the code: ' + e.message, 8000, true); }
+  }
+  function runNewTab(t) {
+    const w = window.open('', '_blank');   // must happen directly inside the click
+    if (!w) { flash('The browser blocked the new tab. Allow pop-ups for this site and try again.', 9000, true); return; }
+    try {
+      const d = w.document;
+      d.title = t.name;
+      if (d.body) d.body.style.cssText = 'margin:0;background:#1b1d23;color:#ddd;font:14px system-ui,sans-serif';
+      for (const k of CFG) if (window[k] != null && S.copyKeys) w[k] = window[k];
+      const url = bust(base() + 'tools/' + t.file);
+      const inject = (props) => { const s = d.createElement('script'); Object.assign(s, props); d.head.appendChild(s); return s; };
+      // Fetch the code here and run it inline in the new tab (a fresh blank tab can be slow to load scripts by address);
+      // if fetching fails, fall back to a normal script tag.
+      fetch(url, { cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.text(); })
+        .then(code => inject({ textContent: code }))
+        .catch(() => { const s = inject({ src: url }); s.onerror = () => { try { w.alert('Could not load ' + t.file); } catch {} }; });
+      flash('Opened "' + t.name + '" in a new tab. Tools that read the page will see a blank page there.', 7000);
+    } catch (e) { flash('Could not start it in the new tab: ' + e.message, 8000, true); }
   }
 
   function run(t) {
@@ -195,6 +280,7 @@
     row('Sort tools', select('sort', [['Menu order', 'order'], ['A to Z', 'az'], ['Recently used', 'recent']]));
     row('Site matches first', check('siteFirst'));
     row('Close hub after running a tool', check('closeOnRun'));
+    row('Include my keys when copying code', check('copyKeys'));
 
     sec('Repo shortcuts');
     const link = (t, href) => sPane.append(el('a', { className: 'lnk', textContent: t, href, target: '_blank', rel: 'noopener' }));
@@ -225,10 +311,10 @@
   // ---- Wiring ----
   $('.x').onclick = close;
   $('.gear').onclick = () => setView(view === 'set' ? 'list' : 'set');
-  q.addEventListener('input', () => { sel = 0; render(); });
+  q.addEventListener('input', () => { sel = 0; menuFor = ''; manual = null; render(); });
   P.addEventListener('keydown', e => {
     e.stopPropagation();
-    if (e.key === 'Escape') { view === 'set' ? setView('list') : close(); return; }
+    if (e.key === 'Escape') { if (view === 'set') setView('list'); else if (menuFor) { menuFor = ''; manual = null; render(); } else close(); return; }
     if (view !== 'list') return;
     if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, shown.length - 1); render(); e.preventDefault(); }
     else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); render(); e.preventDefault(); }
