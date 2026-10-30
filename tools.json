@@ -11,6 +11,12 @@
     "desc": "Chat overlay using OpenRouter, asks for your key on first use",
     "tags": "ai chat openrouter"
   },
+      {
+    "name": "Chat",
+    "file": "chat.js",
+    "desc": "Group chat that saves across devices",
+    "tags": "chat messages friends"
+  },
     {
     "name": "IFrame",
     "file": "float-window.js",
