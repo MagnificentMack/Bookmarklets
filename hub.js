@@ -17,6 +17,95 @@
   const S = (() => { try { return { ...DEF, ...JSON.parse(localStorage.getItem(SK) || '{}') }; } catch { return { ...DEF }; } })();
   const save = () => { try { localStorage.setItem(SK, JSON.stringify(S)); } catch {} };
 
+  // ---- OneLine: turns code into a single line that is safe to paste into an address bar or a bookmark ----
+  const oneLine = src => {
+    src = String(src).replace(/^\uFEFF/, '');
+    const n = src.length;
+    const isWord = ch => /[A-Za-z0-9_$]/.test(ch) || (ch > '\x7f' && !/[\u00A0\u2028\u2029\uFEFF]/.test(ch));
+    const KW = /^(return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/;
+    const STMT = /^(const|let|var|function|class|if|for|return|try|switch|throw|break|continue|do|async|import|export)$/;
+    const DECL = /^(const|let|var|function|class)$/;
+    const NOSEMI = /^(else|do|return|typeof|void|delete|new|throw|case|default|in|of|instanceof|await|yield|extends|async)$/;
+    let i = 0;
+
+    const template = out => {                    // i is just after the opening backtick
+      out.push('`');
+      while (i < n) {
+        const c = src[i];
+        if (c === '\\') {
+          if (src[i + 1] === '\n') { i += 2; continue; }
+          if (src[i + 1] === '\r') { i += src[i + 2] === '\n' ? 3 : 2; continue; }
+          out.push(c, src[i + 1] === undefined ? '' : src[i + 1]); i += 2; continue;
+        }
+        if (c === '`') { out.push('`'); i++; return; }
+        if (c === '$' && src[i + 1] === '{') { out.push('${'); i += 2; const inner = []; code(inner, true); out.push(inner.join(''), '}'); continue; }
+        if (c === '\r') { if (src[i + 1] === '\n') i++; out.push('\\n'); i++; continue; }
+        if (c === '\n') { out.push('\\n'); i++; continue; }
+        out.push(c); i++;
+      }
+    };
+
+    const code = (out, inTpl) => {
+      let depth = 0, lastCh = '', lastWord = '', sp = false, nl = false;
+      const put = (s, word) => {
+        if (sp || nl) {
+          let sep = '';
+          if (nl && word && lastCh && STMT.test(s) && !NOSEMI.test(lastWord)) {
+            const endsExpr = lastCh === '}' || lastCh === ']' || isWord(lastCh) || lastCh === "'" || lastCh === '"' || lastCh === '`';
+            if (endsExpr || (lastCh === ')' && DECL.test(s))) sep = ';';   // never after ")" for if/for/while bodies
+          }
+          if (!sep && nl && word && s === 'else' && lastCh && lastCh !== '}' && lastCh !== ';' && !'({[,'.includes(lastCh)) sep = ';';   // "if (x) a()" newline "else" relied on automatic semicolons
+          if (!sep && lastCh && !'({[;,'.includes(lastCh) && !')}];,'.includes(s[0])) sep = ' ';
+          out.push(sep + s);
+        } else out.push(s);
+        lastCh = s[s.length - 1]; lastWord = word ? s : ''; sp = nl = false;
+      };
+      while (i < n) {
+        const c = src[i];
+        if (c === ' ' || c === '\t' || c === '\f' || c === '\v' || c === '\u00A0' || c === '\uFEFF') { sp = true; i++; continue; }
+        if (c === '\n' || c === '\r' || c === '\u2028' || c === '\u2029') { sp = nl = true; i++; continue; }
+        if (c === '/' && src[i + 1] === '/') { while (i < n && src[i] !== '\n' && src[i] !== '\r') i++; sp = true; continue; }
+        if (c === '/' && src[i + 1] === '*') {
+          const e = src.indexOf('*/', i + 2), body = src.slice(i, e < 0 ? n : e + 2);
+          i = e < 0 ? n : e + 2; sp = true; if (/[\n\r]/.test(body)) nl = true; continue;
+        }
+        if (c === "'" || c === '"') {
+          let j = i + 1, str = c;
+          while (j < n && src[j] !== c) {
+            if (src[j] === '\\') {
+              if (src[j + 1] === '\n') { j += 2; continue; }
+              if (src[j + 1] === '\r') { j += src[j + 2] === '\n' ? 3 : 2; continue; }
+              str += src[j] + (src[j + 1] === undefined ? '' : src[j + 1]); j += 2;
+            } else { str += src[j]; j++; }
+          }
+          i = j + 1; put(str + c, false); continue;
+        }
+        if (c === '`') { const t = []; i++; template(t); put(t.join(''), false); continue; }
+        if (c === '/' && (!lastCh || '(,=:[!&|?{};+-*%<>~^'.includes(lastCh) || (lastWord && KW.test(lastWord)))) {
+          let j = i + 1, inCls = false;                       // regular expression literal
+          while (j < n) {
+            const d = src[j];
+            if (d === '\\') { j += 2; continue; }
+            if (d === '[') inCls = true; else if (d === ']') inCls = false;
+            else if (d === '/' && !inCls) break; else if (d === '\n') break;
+            j++;
+          }
+          j++; while (j < n && /[A-Za-z]/.test(src[j])) j++;
+          put(src.slice(i, j), false); i = j; continue;
+        }
+        if (c === '{') depth++;
+        else if (c === '}') { if (inTpl && depth === 0) { i++; return; } depth--; }
+        if (isWord(c)) { let j = i; while (j < n && isWord(src[j])) j++; put(src.slice(i, j), true); i = j; continue; }
+        put(c, false); i++;
+      }
+    };
+    const out = []; code(out, false);
+    return out.join('').trim();
+  };
+  // Address bars and bookmarks decode %xx sequences in javascript: addresses, so protect the characters that matter
+  const toAddress = code => 'javascript:' + code.replace(/%/g, '%25').replace(/#/g, '%23');
+  // ---- /OneLine ----
+
   const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); kids.forEach(k => e.append(k)); return e; };
 
   // ---- Shell ----
@@ -134,7 +223,7 @@
         const sub = el('div', { className: 'sub' },
           item('Open in a new tab', runNewTab),
           item('Copy code to run in another tab', copyCode),
-          el('div', { className: 'hint', textContent: 'A bookmarklet cannot reach into another tab, so to use a tool on a page where the hub is blocked (like Google Docs): copy the code, switch to that tab, press F12, open Console, paste, press Enter.' }));
+          el('div', { className: 'hint', textContent: 'A bookmarklet cannot reach into another tab. To use a tool on a page where the hub is blocked (like Google Docs): copy the code, go to that tab, click the address bar, type javascript: and paste, then press Enter. No console needed.' }));
         if (manual && manual.file === t.file) {
           const ta = el('textarea', { value: manual.code, readOnly: true });
           ta.onfocus = () => ta.select();
@@ -159,8 +248,8 @@
     const r = await fetch(bust(base() + 'tools/' + t.file), { cache: 'no-store' });
     if (!r.ok) throw new Error(t.file + ' returned ' + r.status);
     const code = await r.text();
-    const pre = S.copyKeys ? CFG.filter(k => window[k] != null && window[k] !== '').map(k => 'window.' + k + '=' + JSON.stringify(window[k]) + ';').join('\n') : '';
-    return '// ' + t.name + ' (copied from Hub)\n' + (pre ? pre + '\n' : '') + code;
+    const pre = S.copyKeys ? CFG.filter(k => window[k] != null && window[k] !== '').map(k => 'window.' + k + '=' + JSON.stringify(window[k]) + ';').join('') : '';
+    return toAddress(pre + oneLine(code));
   }
   async function copyCode(t) {
     flash('Getting the code...', 4000);
@@ -179,8 +268,8 @@
         try { const ta = document.createElement('textarea'); ta.value = code; ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
           document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch {}
       }
-      if (ok) flash('Copied "' + t.name + '". Switch to the other tab, press F12, open Console (if it asks, type "allow pasting" and press Enter), paste, press Enter.');
-      else { manual = { file: t.file, code }; flash('Could not copy automatically. Select the box below, copy it, and paste it into the other tab\'s console.', 12000, true); render(); }
+      if (ok) flash('Copied "' + t.name + '" (' + Math.max(1, Math.round(code.length / 1024)) + ' KB). Go to the other tab, click the address bar, type javascript: then paste (Ctrl+V) and press Enter. You can also paste it as the address of a new bookmark.', 14000);
+      else { manual = { file: t.file, code }; flash('Could not copy automatically. Select the box below and copy it, then use it in the other tab\'s address bar.', 12000, true); render(); }
     } catch (e) { flash('Could not get the code: ' + e.message, 8000, true); }
   }
   function runNewTab(t) {
