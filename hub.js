@@ -150,6 +150,12 @@
       .sub{margin:2px 10px 8px;padding:6px;border-radius:8px;background:var(--in);border:1px solid var(--bd)}
       .sub .mi{display:block;width:100%;text-align:left;background:none;color:var(--fg);border:0;border-radius:6px;padding:8px;margin:0;cursor:pointer;font:inherit}
       .sub .mi:hover{background:var(--hv)}
+      .dragrow{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:6px 8px}
+      .dragrow .lbl{color:var(--mut);font-size:.82em}
+      a.dragger{display:inline-flex;align-items:center;gap:7px;background:var(--ac);color:#fff;text-decoration:none;border-radius:8px;padding:7px 12px;cursor:grab;font-weight:600;user-select:none}
+      a.dragger::before{content:'\u283F';opacity:.85}
+      a.dragger:active{cursor:grabbing}
+      .sub .mi.small{font-size:.85em;color:var(--mut)}
       .sub .hint{padding:4px 8px 2px;color:var(--mut);font-size:.82em;line-height:1.35}
       .sub textarea{width:100%;height:70px;margin-top:6px;background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:6px;font:11px monospace}
     </style>
@@ -219,11 +225,21 @@
       row.onclick = () => run(t);
       lPane.append(row);
       if (open) {
-        const item = (label, fn) => el('button', { className: 'mi', textContent: label, onclick: e => { e.stopPropagation(); fn(t); } });
+        const item = (label, fn, cls = '') => el('button', { className: 'mi ' + cls, textContent: label, onclick: e => { e.stopPropagation(); fn(t); } });
+        const cached = codeCache.get(t.file);
+        if (!cached) ensureCode(t);
+        const dragRow = el('div', { className: 'dragrow' }, el('span', { className: 'lbl', textContent: 'Drag to your bookmarks bar:' }));
+        if (cached && cached.url) {
+          const a = el('a', { className: 'dragger', href: cached.url, textContent: t.name, title: 'Drag me into your bookmarks bar' });
+          a.draggable = true;
+          a.onclick = e => { e.preventDefault(); e.stopPropagation(); flash('Drag this button into your bookmarks bar instead of clicking it. Show the bar with Ctrl+Shift+B.', 8000); };
+          dragRow.append(a, el('span', { className: 'lbl', textContent: Math.max(1, Math.round(a.href.length / 1024)) + ' KB' }));   // size of the real bookmark (browsers expand spaces to %20)
+        } else dragRow.append(el('span', { className: 'lbl', textContent: cached && cached.err ? 'Could not prepare it: ' + cached.err : 'Preparing...' }));
         const sub = el('div', { className: 'sub' },
           item('Open in a new tab', runNewTab),
-          item('Copy code to run in another tab', copyCode),
-          el('div', { className: 'hint', textContent: 'A bookmarklet cannot reach into another tab. To use a tool on a page where the hub is blocked (like Google Docs): copy the code, go to that tab, click the address bar, type javascript: and paste, then press Enter. No console needed.' }));
+          dragRow,
+          item('Copy it instead', copyCode, 'small'),
+          el('div', { className: 'hint', textContent: 'A bookmarklet cannot reach into another tab. For pages where the hub is blocked (like Google Docs), drag the blue button into your bookmarks bar, then click that bookmark on the page. Very long bookmarks may not sync to your other devices.' }));
         if (manual && manual.file === t.file) {
           const ta = el('textarea', { value: manual.code, readOnly: true });
           ta.onfocus = () => ta.select();
@@ -244,6 +260,13 @@
     note.textContent = msg; note.className = 'note' + (isErr ? ' err' : ''); note.hidden = false;
     clearTimeout(noteT); noteT = setTimeout(() => { note.hidden = true; }, ms);
   };
+  const codeCache = new Map(), pendingCode = new Set();
+  function ensureCode(t) {            // prepare the address ahead of time so the button is ready to drag
+    if (pendingCode.has(t.file)) return;
+    pendingCode.add(t.file);
+    getToolCode(t).then(url => codeCache.set(t.file, { url })).catch(e => codeCache.set(t.file, { err: e.message }))
+      .finally(() => { pendingCode.delete(t.file); if (menuFor === t.file) render(); });
+  }
   async function getToolCode(t) {
     const r = await fetch(bust(base() + 'tools/' + t.file), { cache: 'no-store' });
     if (!r.ok) throw new Error(t.file + ' returned ' + r.status);
@@ -254,7 +277,8 @@
   async function copyCode(t) {
     flash('Getting the code...', 4000);
     try {
-      const p = getToolCode(t);
+      const hit = codeCache.get(t.file);
+      const p = hit && hit.url ? Promise.resolve(hit.url) : getToolCode(t);
       let ok = false;
       try {   // deferred clipboard write keeps the click's permission even though we fetch first
         if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
@@ -344,9 +368,9 @@
       s.onchange = () => { S[key] = s.value; save(); applyLook(); };
       return s;
     };
-    const check = key => {
+    const check = (key, after) => {
       const c = el('input', { type: 'checkbox', checked: !!S[key] });
-      c.onchange = () => { S[key] = c.checked; save(); applyLook(); };
+      c.onchange = () => { S[key] = c.checked; save(); if (after) after(); applyLook(); };
       return c;
     };
     const info = t => sPane.append(el('div', { className: 'info', textContent: t }));
@@ -369,7 +393,7 @@
     row('Sort tools', select('sort', [['Menu order', 'order'], ['A to Z', 'az'], ['Recently used', 'recent']]));
     row('Site matches first', check('siteFirst'));
     row('Close hub after running a tool', check('closeOnRun'));
-    row('Include my keys when copying code', check('copyKeys'));
+    row('Include my keys in bookmarks and copied code', check('copyKeys', () => codeCache.clear()));
 
     sec('Repo shortcuts');
     const link = (t, href) => sPane.append(el('a', { className: 'lnk', textContent: t, href, target: '_blank', rel: 'noopener' }));
