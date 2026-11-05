@@ -25,7 +25,7 @@
   },
   {
     "name": "Fluid",
-    "file": "fluid-readable.js"
+    "file": "fluid-readable.js",
     "desc": "Turns the page into liquid",
     "tags": "Effect"
   },
