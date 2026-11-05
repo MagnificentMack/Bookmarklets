@@ -24,6 +24,12 @@
     "tags": "iframe browser window"
   },
   {
+    "name": "Fluid",
+    "file": "fluid-readable.js"
+    "desc": "Turns the page into liquid",
+    "tags": "Effect"
+  },
+  {
     "name": "Krillion Cheats",
     "file": "gemini-screenshot.js",
     "desc": "Screenshot the page and get the best answer from Gemini (needs window.__K)",
