@@ -6,12 +6,6 @@
     "needs": ["lib/apipool.js"],
     "v": "1.0", "date": "2026-11-13", "note": "New: shows which key answered and what it skipped"
   },
-  {
-    "name": "AI Chat (lite)",
-    "file": "ai-chat-lite.js",
-    "desc": "Chat overlay using OpenRouter, asks for your key on first use",
-    "tags": "ai chat openrouter"
-  },
       {
     "name": "Chat",
     "file": "chat.js",
