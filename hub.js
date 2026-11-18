@@ -1,6 +1,6 @@
 (() => {
   // ---- Where am I loaded from? (the loader bookmark decides; nothing is hard-coded here) ----
-  const SRC = (document.currentScript && document.currentScript.src) || '';
+  const SRC = (document.currentScript && document.currentScript.src) || window.__HUB_SRC || '';
   const M = /\/gh\/([^/]+)\/([^@/]+)@([^/]+)\//.exec(SRC);
   if (!M) { alert('Hub: could not read the repo from the script address.'); return; }
   const USER = M[1], REPO = M[2], VER = M[3];
@@ -12,7 +12,7 @@
 
   // ---- Settings (saved in this site's localStorage, so they are per-site) ----
   const SK = '__hub_settings_v1';
-  const DEF = { theme: 'dark', size: 'm', sort: 'order', siteFirst: true, desc: true, closeOnRun: true, copyKeys: true, favs: [], recent: [] };
+  const DEF = { theme: 'dark', size: 'm', sort: 'order', siteFirst: true, desc: true, closeOnRun: true, copyKeys: true, badges: true, seen: null, favs: [], recent: [] };
   const SIZES = { s: { w: 280, f: 13 }, m: { w: 320, f: 14 }, l: { w: 380, f: 16 } };
   const S = (() => { try { return { ...DEF, ...JSON.parse(localStorage.getItem(SK) || '{}') }; } catch { return { ...DEF }; } })();
   const save = () => { try { localStorage.setItem(SK, JSON.stringify(S)); } catch {} };
@@ -144,6 +144,11 @@
       a.lnk:hover{text-decoration:underline}
       .info{padding:3px 6px;color:var(--mut);font-size:.9em}
       .ok{color:#3fb950}.no{color:#f85149}
+      .bdgn{margin-left:6px;font-size:.66em;font-weight:700;letter-spacing:.05em;background:#2ea043;color:#fff;border-radius:4px;padding:1px 5px;vertical-align:middle}
+      .i small.chg{color:#58c47a}
+      .whatsnew{padding:6px 8px;color:#58c47a;font-size:.85em;line-height:1.35}
+      .wn{padding:6px;border-bottom:1px solid var(--bd)} .wn small{color:var(--mut);margin-left:6px} .wn div{color:var(--fg);font-size:.9em;margin-top:2px}
+      .qr{padding:5px 6px} .qr .qt{display:flex;justify-content:space-between;font-size:.9em} .qb{height:6px;border-radius:3px;background:var(--bd);overflow:hidden;margin-top:4px} .qf{height:100%;background:var(--ac)} .qf.out{background:#f85149}
       .note.err{background:#3d1f1f;color:#ffb4ab}
       .more{font-weight:700;padding:2px 7px;border-radius:6px}
       .more:hover,.more.on{background:var(--hv);color:var(--fg)}
@@ -211,7 +216,10 @@
     shown.forEach((t, i) => {
       const fav = S.favs.includes(t.file);
       const txt = el('div', { className: 't' }, el('b', { textContent: t.name }));
+      const cs = changeState(t);
+      if (cs) txt.append(el('span', { className: 'bdgn', textContent: cs === 'new' ? 'NEW' : 'UPDATED' }));
       if (S.desc && t.desc) txt.append(el('small', { textContent: t.desc }));
+      if (cs && t.note) txt.append(el('small', { className: 'chg', textContent: noteLine(t) }));
       const star = el('span', { className: 'st' + (fav ? ' on' : ''), title: fav ? 'Unpin' : 'Pin to top', textContent: fav ? '\u2605' : '\u2606' });
       star.onclick = e => {
         e.stopPropagation();
@@ -220,7 +228,7 @@
       };
       const open = menuFor === t.file;
       const more = el('span', { className: 'st more' + (open ? ' on' : ''), title: 'More ways to launch', textContent: '\u22EE' });
-      more.onclick = e => { e.stopPropagation(); menuFor = open ? '' : t.file; manual = null; render(); q.focus(); };
+      more.onclick = e => { e.stopPropagation(); menuFor = open ? '' : t.file; manual = null; if (!open) markSeen(t); render(); q.focus(); };
       const row = el('div', { className: 'i' + (i === sel ? ' sel' : '') }, txt, star, more);
       row.onclick = () => run(t);
       lPane.append(row);
@@ -236,6 +244,7 @@
           dragRow.append(a, el('span', { className: 'lbl', textContent: Math.max(1, Math.round(a.href.length / 1024)) + ' KB' }));   // size of the real bookmark (browsers expand spaces to %20)
         } else dragRow.append(el('span', { className: 'lbl', textContent: cached && cached.err ? 'Could not prepare it: ' + cached.err : 'Preparing...' }));
         const sub = el('div', { className: 'sub' },
+          t.note ? el('div', { className: 'whatsnew', textContent: "What's new \u2014 " + noteLine(t) }) : '',
           item('Open in a new tab', runNewTab),
           dragRow,
           item('Copy it instead', copyCode, 'small'),
@@ -255,11 +264,22 @@
     }
   }
 
-  const CFG = ['__K', '__OR', '__CHAT_DB', '__CHAT_ROOM', '__CHAT_NAME'];
+  const CFG = ['__K', '__OR', '__VAULT', '__CHAT_DB', '__CHAT_ROOM', '__CHAT_NAME'];
   const flash = (msg, ms = 10000, isErr = false) => {
     note.textContent = msg; note.className = 'note' + (isErr ? ' err' : ''); note.hidden = false;
     clearTimeout(noteT); noteT = setTimeout(() => { note.hidden = true; }, ms);
   };
+  // ---- NEW / UPDATED badges: tools.json can give a tool "v" (version), "date" and "note"; the hub remembers what you have seen ----
+  const verOf = t => String(t.v != null ? t.v : (t.date || ''));
+  const changeState = t => {
+    const cur = verOf(t);
+    if (!S.badges || !cur || !S.seen) return '';
+    if (!(t.file in S.seen)) return 'new';
+    return S.seen[t.file] !== cur ? 'upd' : '';
+  };
+  const markSeen = t => { const cur = verOf(t); if (!cur) return; S.seen = S.seen || {}; if (S.seen[t.file] !== cur) { S.seen[t.file] = cur; save(); } };
+  const noteLine = t => (t.v != null ? 'v' + t.v : '') + (t.date ? (t.v != null ? ' (' + t.date + ')' : t.date) : '') + (t.note ? (t.v != null || t.date ? ': ' : '') + t.note : '');
+
   const codeCache = new Map(), pendingCode = new Set();
   function ensureCode(t) {            // prepare the address ahead of time so the button is ready to drag
     if (pendingCode.has(t.file)) return;
@@ -268,13 +288,17 @@
       .finally(() => { pendingCode.delete(t.file); if (menuFor === t.file) render(); });
   }
   async function getToolCode(t) {
-    const r = await fetch(bust(base() + 'tools/' + t.file), { cache: 'no-store' });
-    if (!r.ok) throw new Error(t.file + ' returned ' + r.status);
-    const code = await r.text();
+    const parts = [];
+    for (const f of toolFiles(t)) {                // shared libraries first, then the tool itself
+      const r = await fetch(bust(base() + f), { cache: 'no-store' });
+      if (!r.ok) throw new Error(f + ' returned ' + r.status);
+      parts.push(oneLine(await r.text()));
+    }
     const pre = S.copyKeys ? CFG.filter(k => window[k] != null && window[k] !== '').map(k => 'window.' + k + '=' + JSON.stringify(window[k]) + ';').join('') : '';
-    return toAddress(pre + oneLine(code));
+    return toAddress(pre + parts.join(';'));
   }
   async function copyCode(t) {
+    markSeen(t);
     flash('Getting the code...', 4000);
     try {
       const hit = codeCache.get(t.file);
@@ -298,37 +322,55 @@
   }
   function runNewTab(t) {
     const w = window.open('', '_blank');   // must happen directly inside the click
+    markSeen(t);
     if (!w) { flash('The browser blocked the new tab. Allow pop-ups for this site and try again.', 9000, true); return; }
     try {
       const d = w.document;
       d.title = t.name;
       if (d.body) d.body.style.cssText = 'margin:0;background:#1b1d23;color:#ddd;font:14px system-ui,sans-serif';
       for (const k of CFG) if (window[k] != null && S.copyKeys) w[k] = window[k];
-      const url = bust(base() + 'tools/' + t.file);
-      const inject = (props) => { const s = d.createElement('script'); Object.assign(s, props); d.head.appendChild(s); return s; };
+      const inject = props => { const s = d.createElement('script'); Object.assign(s, props); d.head.appendChild(s); return s; };
       // Fetch the code here and run it inline in the new tab (a fresh blank tab can be slow to load scripts by address);
       // if fetching fails, fall back to a normal script tag.
-      fetch(url, { cache: 'no-store' })
-        .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.text(); })
-        .then(code => inject({ textContent: code }))
-        .catch(() => { const s = inject({ src: url }); s.onerror = () => { try { w.alert('Could not load ' + t.file); } catch {} }; });
+      (async () => {
+        try { for (const f of toolFiles(t)) { const r = await fetch(bust(base() + f), { cache: 'no-store' }); if (!r.ok) throw new Error(String(r.status)); inject({ textContent: await r.text() }); } }
+        catch (e) { const s = inject({ src: bust(base() + 'tools/' + t.file) }); s.onerror = () => { try { w.alert('Could not load ' + t.file); } catch {} }; }
+      })();
       flash('Opened "' + t.name + '" in a new tab. Tools that read the page will see a blank page there.', 7000);
     } catch (e) { flash('Could not start it in the new tab: ' + e.message, 8000, true); }
   }
 
+  // Load one repo file into a document: a normal script tag first; if the page refuses it, fetch the code and run it inline.
+  const loadFile = (path, doc = document) => new Promise((resolve, reject) => {
+    const url = bust(base() + path);
+    let settled = false;
+    const inline = () => { if (settled) return; settled = true;
+      fetch(url, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(path + ' returned ' + r.status); return r.text(); })
+        .then(code => { doc.head.appendChild(Object.assign(doc.createElement('script'), { textContent: code })); resolve(); }).catch(reject); };
+    const s = doc.createElement('script'); s.src = url;
+    s.onload = () => { if (!settled) { settled = true; resolve(); } };
+    s.onerror = inline;
+    doc.head.appendChild(s);
+    setTimeout(inline, 6000);                      // no event at all: try the inline route
+  });
+  const toolFiles = t => [...(t.needs || []), 'tools/' + t.file];
+
   function run(t) {
+    markSeen(t);
     S.recent = [t.file, ...S.recent.filter(f => f !== t.file)].slice(0, 8);
     save();
     if (S.closeOnRun) close();
-    const s = el('script', { src: bust(base() + 'tools/' + t.file) });
-    s.onerror = () => alert('Could not load ' + t.file + '. Check the filename, or the site may block external scripts.');
-    document.head.appendChild(s);
+    toolFiles(t).reduce((p, f) => p.then(() => loadFile(f)), Promise.resolve())
+      .catch(e => alert('Could not load ' + t.file + ' (' + e.message + '). Check the filenames in tools.json, or the site may block external scripts.'));
   }
 
   async function loadTools() {
     const r = await fetch(bust(base() + 'tools.json'), { cache: 'no-store' });
     if (!r.ok) throw new Error('tools.json returned ' + r.status);
     tools = await r.json();
+    if (!S.seen) {            // first time on this site: treat everything as already seen, so only FUTURE changes show a badge
+      S.seen = {}; tools.forEach(t => { const c = verOf(t); if (c) S.seen[t.file] = c; }); save();
+    }
   }
 
   // ---- Update: only runs when you press the button ----
@@ -384,10 +426,23 @@
     info('Loaded version: ' + (VER === 'main' ? 'main (branch, may be cached)' : VER.slice(0, 7)));
     info('Tools loaded: ' + tools.length);
 
+    sec("What's new");
+    const noted = tools.filter(t => t.note).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 8);
+    if (!noted.length) info('No update notes yet. Give a tool a "v", "date" and "note" in tools.json and it shows up here.');
+    noted.forEach(t => {
+      const cs = changeState(t);
+      sPane.append(el('div', { className: 'wn' }, el('b', { textContent: t.name }),
+        cs ? el('span', { className: 'bdgn', textContent: cs === 'new' ? 'NEW' : 'UPDATED' }) : '',
+        el('small', { textContent: [t.v != null ? 'v' + t.v : '', t.date || ''].filter(Boolean).join(' \u00B7 ') }),
+        el('div', { textContent: t.note })));
+    });
+    if (noted.length) sPane.append(el('button', { textContent: 'Mark all as seen', onclick: () => { tools.forEach(markSeen); renderSettings(); } }));
+
     sec('Display');
     row('Theme', select('theme', [['Dark', 'dark'], ['Light', 'light'], ['Match system', 'auto']]));
     row('Size', select('size', [['Small', 's'], ['Medium', 'm'], ['Large', 'l']]));
     row('Show descriptions', check('desc'));
+    row('Show NEW / UPDATED badges', check('badges'));
 
     sec('Behavior');
     row('Sort tools', select('sort', [['Menu order', 'order'], ['A to Z', 'az'], ['Recently used', 'recent']]));
@@ -404,6 +459,12 @@
     sec('Keys (set in your loader bookmark)');
     row('Gemini key (__K)', el('span', { className: window.__K ? 'ok' : 'no', textContent: window.__K ? 'set' : 'not set' }));
     row('OpenRouter key (__OR)', el('span', { className: window.__OR ? 'ok' : 'no', textContent: window.__OR ? 'set' : 'not set' }));
+
+    sec('AI keys');
+    info('Keep any number of API keys (Gemini, OpenRouter, Claude, any OpenAI-style service) in an encrypted vault in your database. When one runs out, the next is used automatically.');
+    const kt = tools.find(t => t.file === 'api-keys.js');
+    sPane.append(el('button', { textContent: kt ? 'Open the API keys tool' : 'Add api-keys.js to tools.json first', disabled: !kt, onclick: () => { if (kt) run(kt); } }));
+    row('Vault passphrase (__VAULT)', el('span', { className: window.__VAULT ? 'ok' : 'no', textContent: window.__VAULT ? 'set' : 'not set' }));
 
     sec('Data');
     sPane.append(

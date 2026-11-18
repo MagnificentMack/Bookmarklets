@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Hub</title>
+<body style="margin:0;background:#1b1d23;color:#ddd;font:14px system-ui,sans-serif">
+<p style="padding:18px">Starting the hub&hellip;</p>
+<script>
+// The hub address is fixed here on purpose: this page never loads code from an address it is told about.
+var SRC = 'https://cdn.jsdelivr.net/gh/MagnificentMack/Bookmarklets@main/hub.js';
+var ALLOWED = ['__K', '__OR', '__VAULT', '__CHAT_DB', '__CHAT_ROOM', '__CHAT_NAME'];   // the only settings it accepts from the opening tab
+var started = false;
+function start(cfg) {
+  if (started) return; started = true;
+  for (var i = 0; i < ALLOWED.length; i++) { var k = ALLOWED[i]; if (cfg && typeof cfg[k] === 'string') window[k] = cfg[k]; }
+  var s = document.createElement('script');
+  s.src = SRC + '?_=' + Date.now();
+  document.head.appendChild(s);
+}
+if (window.opener) {
+  window.addEventListener('message', function (e) { if (e.source === window.opener && e.data && e.data.hubCfg) start(e.data.hubCfg); });
+  window.opener.postMessage('hub-ready', '*');
+  setTimeout(function () { start({}); }, 2500);     // no settings arrived (the opening tab may have been cut off): start without them
+} else start({});
+</script>
