@@ -1,9 +1,10 @@
 [
     {
-    "name": "AI Chat",
-    "file": "chatBot.js",
-    "desc": "Full AI Chat Bot",
-    "tags": "Magnificent Mack"
+    "name": "AI chat",
+    "file": "ai-chat.js",
+    "desc": "Chat that switches API keys automatically",
+    "needs": ["lib/apipool.js"],
+    "v": "1.0", "date": "2026-11-13", "note": "New: shows which key answered and what it skipped"
   },
   {
     "name": "AI Chat (lite)",
@@ -18,6 +19,13 @@
     "tags": "chat messages friends"
   },
     {
+    "name": "API keys",
+    "file": "api-keys.js",
+    "desc": "Store any number of API keys; the next one is used automatically when one runs out",
+    "needs": ["lib/apipool.js"],
+    "v": "1.0", "date": "2026-11-13", "note": "New: encrypted key vault for Gemini, OpenRouter, Claude and any OpenAI-style service"
+  },
+    {
     "name": "IFrame",
     "file": "float-window.js",
     "desc": "Open any URL in a draggable, resizable window",
@@ -26,9 +34,9 @@
   {
     "name": "Krillion Cheats",
     "file": "gemini-screenshot.js",
-    "desc": "Screenshot the page and get the best answer from Gemini (needs window.__K)",
-    "tags": "krillion ai",
-    "sites": ["krillion.io", "krillion.org"]
+    "desc": "Screenshot the page and get answers from whichever API key has quota left",
+    "needs": ["lib/apipool.js"],
+    "v": "3.0", "date": "2026-11-13", "note": "Now uses every key in your vault (any provider) and switches automatically"
   },
   {
     "name": "Krillion Game",
